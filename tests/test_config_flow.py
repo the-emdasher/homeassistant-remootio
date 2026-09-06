@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 import voluptuous as vol
+import voluptuous_serialize
 from homeassistant.config_entries import (
     SOURCE_REAUTH,
     SOURCE_RECONFIGURE,
@@ -14,6 +15,7 @@ from homeassistant.config_entries import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -71,6 +73,52 @@ async def test_user_setup_remootio_2_declares_secondary(
     assert result["data"]["serial_number"] == SERIAL
     assert result["data"]["secondary_relay"] is True
     assert probe.await_args.kwargs["expected_serial"] is None
+
+
+async def test_user_form_schema_is_frontend_serializable(
+    hass: HomeAssistant,
+) -> None:
+    """The HTTP config-flow API can serialize every initial form field."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_USER}
+    )
+
+    serialized = voluptuous_serialize.convert(
+        result["data_schema"], custom_serializer=cv.custom_serializer
+    )
+
+    assert {field["name"] for field in serialized} == {
+        "host",
+        "port",
+        "api_secret_key",
+        "api_auth_key",
+    }
+    secret_field = next(
+        field for field in serialized if field["name"] == "api_secret_key"
+    )
+    assert secret_field["selector"]["text"]["type"] == "password"
+
+
+async def test_user_input_validation_returns_field_errors_before_probe(
+    hass: HomeAssistant,
+) -> None:
+    """Strict non-serializable rules run after the UI submits its form."""
+    with patch(
+        "custom_components.remootio.config_flow.async_probe_device",
+        new=AsyncMock(),
+    ) as probe:
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={"source": SOURCE_USER},
+            data={**USER_INPUT, "host": "ws://bad", "api_secret_key": "short"},
+        )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {
+        "host": "invalid_host",
+        "api_secret_key": "invalid_key",
+    }
+    probe.assert_not_awaited()
 
 
 async def test_user_setup_remootio_1_skips_secondary(

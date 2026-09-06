@@ -9,6 +9,8 @@
     "error": {
       "cannot_connect": "Failed to connect",
       "invalid_auth": "Invalid API credentials",
+      "invalid_host": "Enter a hostname or IP address without a scheme or path",
+      "invalid_key": "The API key must be exactly 64 hexadecimal characters",
       "invalid_response": "The device returned an invalid response",
       "wrong_device": "The address belongs to a different Remootio"
     },
@@ -81,4 +83,3 @@
     }
   }
 }
-

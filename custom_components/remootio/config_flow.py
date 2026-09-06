@@ -8,6 +8,11 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.selector import (
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 
 from .client import ProbeResult, async_probe_device
@@ -52,10 +57,32 @@ def _host(value: Any) -> str:
     return normalized
 
 
+API_KEY_SELECTOR = TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD))
+
 KEY_SCHEMA = {
-    vol.Required(CONF_API_SECRET_KEY): _api_key,
-    vol.Required(CONF_API_AUTH_KEY): _api_key,
+    vol.Required(CONF_API_SECRET_KEY): API_KEY_SELECTOR,
+    vol.Required(CONF_API_AUTH_KEY): API_KEY_SELECTOR,
 }
+
+
+def _normalize_input(
+    user_input: dict[str, Any], *, host: bool = False, keys: bool = False
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """Apply strict validation that cannot be represented by a UI schema."""
+    data = dict(user_input)
+    errors: dict[str, str] = {}
+    if host:
+        try:
+            data[CONF_HOST] = _host(data[CONF_HOST])
+        except vol.Invalid:
+            errors[CONF_HOST] = "invalid_host"
+    if keys:
+        for field in (CONF_API_SECRET_KEY, CONF_API_AUTH_KEY):
+            try:
+                data[field] = _api_key(data[field])
+            except vol.Invalid:
+                errors[field] = "invalid_key"
+    return data, errors
 
 
 class RemootioConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -77,20 +104,21 @@ class RemootioConfigFlow(ConfigFlow, domain=DOMAIN):
         """Handle manual setup."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            data = dict(user_input)
-            try:
-                probe = await self._async_probe(data)
-            except RemootioAuthenticationError:
-                errors["base"] = "invalid_auth"
-            except RemootioConnectionError:
-                errors["base"] = "cannot_connect"
-            except RemootioProtocolError:
-                errors["base"] = "invalid_response"
-            else:
-                return await self._async_finish_new_entry(data, probe)
+            data, errors = _normalize_input(user_input, host=True, keys=True)
+            if not errors:
+                try:
+                    probe = await self._async_probe(data)
+                except RemootioAuthenticationError:
+                    errors["base"] = "invalid_auth"
+                except RemootioConnectionError:
+                    errors["base"] = "cannot_connect"
+                except RemootioProtocolError:
+                    errors["base"] = "invalid_response"
+                else:
+                    return await self._async_finish_new_entry(data, probe)
 
         schema = vol.Schema({
-            vol.Required(CONF_HOST): _host,
+            vol.Required(CONF_HOST): str,
             vol.Required(CONF_PORT, default=DEFAULT_PORT): vol.All(
                 vol.Coerce(int), vol.Range(min=1, max=65535)
             ),
@@ -127,23 +155,25 @@ class RemootioConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="invalid_discovery")
         errors: dict[str, str] = {}
         if user_input is not None:
+            validated, errors = _normalize_input(user_input, keys=True)
             data = {
                 CONF_HOST: self._discovery_host,
                 CONF_PORT: self._discovery_port,
-                **user_input,
+                **validated,
             }
-            try:
-                probe = await self._async_probe(data, self._discovery_serial)
-            except RemootioAuthenticationError:
-                errors["base"] = "invalid_auth"
-            except RemootioIdentityError:
-                errors["base"] = "wrong_device"
-            except RemootioConnectionError:
-                errors["base"] = "cannot_connect"
-            except RemootioProtocolError:
-                errors["base"] = "invalid_response"
-            else:
-                return await self._async_finish_new_entry(data, probe)
+            if not errors:
+                try:
+                    probe = await self._async_probe(data, self._discovery_serial)
+                except RemootioAuthenticationError:
+                    errors["base"] = "invalid_auth"
+                except RemootioIdentityError:
+                    errors["base"] = "wrong_device"
+                except RemootioConnectionError:
+                    errors["base"] = "cannot_connect"
+                except RemootioProtocolError:
+                    errors["base"] = "invalid_response"
+                else:
+                    return await self._async_finish_new_entry(data, probe)
         return self.async_show_form(
             step_id="zeroconf_confirm",
             data_schema=vol.Schema(KEY_SCHEMA),
@@ -199,29 +229,31 @@ class RemootioConfigFlow(ConfigFlow, domain=DOMAIN):
         entry = self._get_reauth_entry()
         errors: dict[str, str] = {}
         if user_input is not None:
-            candidate = {**entry.data, **user_input}
-            try:
-                probe = await self._async_validate_existing(entry, candidate)
-                await self.async_set_unique_id(probe.identity.serial_number)
-                self._abort_if_unique_id_mismatch()
-            except RemootioAuthenticationError:
-                errors["base"] = "invalid_auth"
-            except RemootioIdentityError:
-                errors["base"] = "wrong_device"
-            except RemootioConnectionError:
-                errors["base"] = "cannot_connect"
-            except RemootioProtocolError:
-                errors["base"] = "invalid_response"
-            else:
-                return self.async_update_reload_and_abort(
-                    entry,
-                    data_updates={
-                        CONF_API_SECRET_KEY: user_input[CONF_API_SECRET_KEY],
-                        CONF_API_AUTH_KEY: user_input[CONF_API_AUTH_KEY],
-                        CONF_MODEL: probe.identity.model,
-                    },
-                    reason="reauth_successful",
-                )
+            validated, errors = _normalize_input(user_input, keys=True)
+            candidate = {**entry.data, **validated}
+            if not errors:
+                try:
+                    probe = await self._async_validate_existing(entry, candidate)
+                    await self.async_set_unique_id(probe.identity.serial_number)
+                    self._abort_if_unique_id_mismatch()
+                except RemootioAuthenticationError:
+                    errors["base"] = "invalid_auth"
+                except RemootioIdentityError:
+                    errors["base"] = "wrong_device"
+                except RemootioConnectionError:
+                    errors["base"] = "cannot_connect"
+                except RemootioProtocolError:
+                    errors["base"] = "invalid_response"
+                else:
+                    return self.async_update_reload_and_abort(
+                        entry,
+                        data_updates={
+                            CONF_API_SECRET_KEY: validated[CONF_API_SECRET_KEY],
+                            CONF_API_AUTH_KEY: validated[CONF_API_AUTH_KEY],
+                            CONF_MODEL: probe.identity.model,
+                        },
+                        reason="reauth_successful",
+                    )
         return self.async_show_form(
             step_id="reauth_confirm",
             data_schema=vol.Schema(KEY_SCHEMA),
@@ -236,34 +268,36 @@ class RemootioConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         supports_secondary = entry.data.get(CONF_MODEL) == MODEL_REMOOTIO_2
         if user_input is not None:
-            candidate = {**entry.data, **user_input}
+            validated, errors = _normalize_input(user_input, host=True)
+            candidate = {**entry.data, **validated}
             if not supports_secondary:
                 candidate[CONF_SECONDARY_RELAY] = False
-            try:
-                probe = await self._async_validate_existing(entry, candidate)
-                await self.async_set_unique_id(probe.identity.serial_number)
-                self._abort_if_unique_id_mismatch()
-            except RemootioAuthenticationError:
-                errors["base"] = "invalid_auth"
-            except RemootioIdentityError:
-                errors["base"] = "wrong_device"
-            except RemootioConnectionError:
-                errors["base"] = "cannot_connect"
-            except RemootioProtocolError:
-                errors["base"] = "invalid_response"
-            else:
-                return self.async_update_reload_and_abort(
-                    entry,
-                    data_updates={
-                        CONF_HOST: candidate[CONF_HOST],
-                        CONF_PORT: candidate[CONF_PORT],
-                        CONF_SECONDARY_RELAY: candidate[CONF_SECONDARY_RELAY],
-                        CONF_MODEL: probe.identity.model,
-                    },
-                )
+            if not errors:
+                try:
+                    probe = await self._async_validate_existing(entry, candidate)
+                    await self.async_set_unique_id(probe.identity.serial_number)
+                    self._abort_if_unique_id_mismatch()
+                except RemootioAuthenticationError:
+                    errors["base"] = "invalid_auth"
+                except RemootioIdentityError:
+                    errors["base"] = "wrong_device"
+                except RemootioConnectionError:
+                    errors["base"] = "cannot_connect"
+                except RemootioProtocolError:
+                    errors["base"] = "invalid_response"
+                else:
+                    return self.async_update_reload_and_abort(
+                        entry,
+                        data_updates={
+                            CONF_HOST: candidate[CONF_HOST],
+                            CONF_PORT: candidate[CONF_PORT],
+                            CONF_SECONDARY_RELAY: candidate[CONF_SECONDARY_RELAY],
+                            CONF_MODEL: probe.identity.model,
+                        },
+                    )
 
         schema_fields: dict[vol.Marker, Any] = {
-            vol.Required(CONF_HOST, default=entry.data[CONF_HOST]): _host,
+            vol.Required(CONF_HOST, default=entry.data[CONF_HOST]): str,
             vol.Required(CONF_PORT, default=entry.data[CONF_PORT]): vol.All(
                 vol.Coerce(int), vol.Range(min=1, max=65535)
             ),
