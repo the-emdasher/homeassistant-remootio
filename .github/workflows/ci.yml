@@ -31,6 +31,9 @@ jobs:
       - uses: home-assistant/actions/hassfest@master
 
   hacs:
+    # HACS only supports public repositories. This job will begin running
+    # automatically when the repository is made public.
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
