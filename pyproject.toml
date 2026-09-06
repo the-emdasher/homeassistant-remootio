@@ -1,0 +1,78 @@
+[build-system]
+requires = ["setuptools>=78"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "homeassistant-remootio"
+version = "0.1.0"
+description = "Local Remootio WebSocket API v3 integration for Home Assistant"
+readme = "README.md"
+requires-python = ">=3.14.2"
+license = "MIT"
+authors = [{ name = "Preston Edwards" }]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python :: 3.14",
+]
+
+[project.urls]
+Documentation = "https://github.com/the-emdasher/homeassistant-remootio"
+Issues = "https://github.com/the-emdasher/homeassistant-remootio/issues"
+Repository = "https://github.com/the-emdasher/homeassistant-remootio"
+
+[dependency-groups]
+test = [
+  "mypy==2.3.1",
+  "pytest-cov>=6.2.1",
+  "pytest-homeassistant-custom-component==0.13.363",
+  "ruff==0.13.2",
+]
+
+[tool.uv]
+# This is a HACS repository, not an installable Python distribution. Keeping
+# it out of site-packages also matches Home Assistant's custom-component loader.
+package = false
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-config --strict-markers --cov=custom_components.remootio --cov-report=term-missing --cov-fail-under=95"
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+exclude_also = [
+  "if TYPE_CHECKING:",
+  "raise NotImplementedError",
+]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 88
+preview = true
+
+[tool.ruff.lint]
+select = ["ASYNC", "B", "E", "F", "I", "RUF", "S", "SIM", "UP"]
+ignore = [
+  "ASYNC109",
+  "ASYNC110",
+  # Home Assistant requires several coroutine entry points even when setup is
+  # currently synchronous internally.
+  "RUF029",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"custom_components/remootio/const.py" = ["S105"]
+"tests/**" = ["S101", "S105", "S106", "S107"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+show_error_codes = true
+warn_unreachable = true
+packages = ["custom_components.remootio"]
+
+[[tool.mypy.overrides]]
+module = ["homeassistant.*"]
+ignore_missing_imports = true

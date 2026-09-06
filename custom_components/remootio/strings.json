@@ -1,0 +1,84 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "This Remootio is already configured",
+      "invalid_discovery": "The discovery information was incomplete",
+      "reauth_successful": "Reauthentication was successful",
+      "reconfigure_successful": "Reconfiguration was successful"
+    },
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid API credentials",
+      "invalid_response": "The device returned an invalid response",
+      "wrong_device": "The address belongs to a different Remootio"
+    },
+    "step": {
+      "reauth_confirm": {
+        "data": {
+          "api_auth_key": "API auth key",
+          "api_secret_key": "API secret key"
+        },
+        "description": "Enter the current WebSocket API credentials.",
+        "title": "Reauthenticate Remootio"
+      },
+      "reconfigure": {
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "secondary_relay": "Secondary free relay configured"
+        },
+        "description": "The secondary option must only be enabled when output 2 is configured as a free relay in the Remootio app.",
+        "title": "Reconfigure Remootio"
+      },
+      "secondary_relay": {
+        "data": {
+          "secondary_relay": "Secondary free relay configured"
+        },
+        "description": "Enable this only when output 2 is configured as a free relay in the Remootio app. The API has no read-only capability query.",
+        "title": "Secondary relay"
+      },
+      "user": {
+        "data": {
+          "api_auth_key": "API auth key",
+          "api_secret_key": "API secret key",
+          "host": "Host",
+          "port": "Port"
+        },
+        "description": "Connect directly to the local Remootio WebSocket API.",
+        "title": "Add Remootio"
+      },
+      "zeroconf_confirm": {
+        "data": {
+          "api_auth_key": "API auth key",
+          "api_secret_key": "API secret key"
+        },
+        "description": "Enter the WebSocket API credentials for Remootio {serial}.",
+        "title": "Confirm Remootio"
+      }
+    }
+  },
+  "entity": {
+    "button": {
+      "primary_trigger": {
+        "name": "Trigger"
+      },
+      "secondary_relay": {
+        "name": "Secondary relay"
+      }
+    },
+    "cover": {
+      "door": {
+        "name": "Door"
+      }
+    }
+  },
+  "exceptions": {
+    "command_failed": {
+      "message": "The {command} command failed because communication with Remootio was lost"
+    },
+    "command_rejected": {
+      "message": "Remootio rejected the {command} command: {error}"
+    }
+  }
+}
+

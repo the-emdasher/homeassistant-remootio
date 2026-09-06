@@ -1,0 +1,16 @@
+{
+  "codeowners": ["@the-emdasher"],
+  "config_flow": true,
+  "documentation": "https://github.com/the-emdasher/homeassistant-remootio",
+  "domain": "remootio",
+  "integration_type": "device",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/the-emdasher/homeassistant-remootio/issues",
+  "loggers": ["custom_components.remootio"],
+  "name": "Remootio",
+  "requirements": [],
+  "version": "0.1.0",
+  "zeroconf": [
+    {"type": "_remootio._tcp.local."}
+  ]
+}
