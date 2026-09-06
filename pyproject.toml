@@ -24,7 +24,7 @@ Repository = "https://github.com/the-emdasher/homeassistant-remootio"
 test = [
   "mypy==2.3.1",
   "pytest-cov>=6.2.1",
-  "pytest-homeassistant-custom-component==0.13.363",
+  "pytest-homeassistant-custom-component==0.13.357",
   "ruff==0.13.2",
 ]
 

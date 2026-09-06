@@ -69,7 +69,7 @@ written to logs or diagnostics.
 
 ## Development
 
-Home Assistant 2026.9.0 and Python 3.14.2 or newer are the initial baseline.
+Home Assistant 2026.8.3 and Python 3.14.2 or newer are the initial baseline.
 
 ```bash
 uv sync --group test
